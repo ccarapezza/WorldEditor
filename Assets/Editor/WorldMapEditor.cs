@@ -13,6 +13,7 @@ enum EditMode
 [CustomEditor(typeof(WorldMap))]
 public class WorldMapEditor : Editor {
     private int m_editMode;
+    private int m_tileSelected;
     void OnSceneGUI()
     {
         WorldMap worldMap = (WorldMap)target;
@@ -28,6 +29,8 @@ public class WorldMapEditor : Editor {
         mousePosition = Camera.current.ScreenToWorldPoint(mousePosition);
 
         Vector2 gridPosition = new Vector2((int)mousePosition.x, (int)mousePosition.y);
+
+        Sprite[] sprites = AssetDatabase.LoadAllAssetsAtPath("Assets/Tileset/mountain_landscape.png").OfType<Sprite>().ToArray();
 
         if (gridPosition.x >= 0 && gridPosition.y >= 0 && gridPosition.x < worldWidth && gridPosition.y < worldHeight)
         {
@@ -45,8 +48,11 @@ public class WorldMapEditor : Editor {
             {
                 if (Event.current.button == 0)
                 {
-                    GameObject tile = Instantiate(worldMap.grassPrefab, worldMap.transform.position+ new Vector3(gridPosition.x, gridPosition.y, 0), Quaternion.identity);
-                    tile.transform.SetParent(worldMap.transform);
+                    if(m_editMode == (int)EditMode.Pencil)
+                        worldMap.CreateTile(sprites[m_tileSelected], gridPosition);
+
+                    if (m_editMode == (int)EditMode.Rubber)
+                        worldMap.DeleteTile(gridPosition);
                 }
 
                 if (Event.current.button == 1)
@@ -80,11 +86,21 @@ public class WorldMapEditor : Editor {
 
         GUILayout.BeginHorizontal();
 
-        Sprite[] sprites = AssetDatabase.LoadAllAssetsAtPath("Assets/Tileset/mountain_landscape.png").OfType<Sprite>().ToArray();
+        Color tmpColor = GUI.backgroundColor;
         for (int i = 0; i < 10; i++)
         {
             Texture2D texture = AssetPreview.GetAssetPreview(sprites[i]);
-            GUILayout.Button(texture);
+            GUIStyle btnStyle = GUI.skin.button;
+            if (m_tileSelected == i)
+            {
+                GUI.backgroundColor = Color.red;
+                GUI.skin.button.border = new RectOffset(5,5,5,5);
+            }
+
+            if (GUILayout.Button(texture, btnStyle))
+                m_tileSelected = i;
+
+            GUI.backgroundColor = tmpColor;
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
