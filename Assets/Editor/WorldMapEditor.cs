@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using System.Linq;
+using System;
 
 enum EditMode
 {
     Pencil,
-    Rubber
+    Rubber,
+    Bucket
 }
 
 [CustomEditor(typeof(WorldMap))]
@@ -33,6 +35,8 @@ public class WorldMapEditor : Editor {
         }
 
         Handles.BeginGUI();
+        
+
 
         Vector3 worldPos = Camera.current.ScreenToWorldPoint(worldPosition);
         Vector3 mousePosition = Event.current.mousePosition;
@@ -41,7 +45,15 @@ public class WorldMapEditor : Editor {
 
         Vector2 gridPosition = new Vector2((int)mousePosition.x, (int)mousePosition.y);
 
-        Sprite[] sprites = AssetDatabase.LoadAllAssetsAtPath("Assets/Tileset/mountain_landscape.png").OfType<Sprite>().ToArray();
+        string[] tileGuids = AssetDatabase.FindAssets("t:Tile", null);
+        List<Tile> tileset = new List<Tile>();
+        foreach (var tileGuid in tileGuids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(tileGuid);
+            tileset.Add(AssetDatabase.LoadAssetAtPath<Tile>(path));
+        }
+
+        //Sprite[] sprites = AssetDatabase.LoadAllAssetsAtPath("Assets/Tileset/mountain_landscape.png").OfType<Sprite>().ToArray();
 
         if (gridPosition.x >= 0 && gridPosition.y >= 0 && gridPosition.x < worldWidth && gridPosition.y < worldHeight)
         {
@@ -60,10 +72,13 @@ public class WorldMapEditor : Editor {
                 if (Event.current.button == 0)
                 {
                     if(m_editMode == (int)EditMode.Pencil)
-                        worldMap.CreateTile(sprites[m_tileSelected], gridPosition, m_layerSelected);
+                        worldMap.CreateTile(tileset[m_tileSelected], gridPosition, m_layerSelected);
 
                     if (m_editMode == (int)EditMode.Rubber)
                         worldMap.DeleteTile(gridPosition, m_layerSelected);
+
+                    if (m_editMode == (int)EditMode.Bucket)
+                        worldMap.PaintTile(tileset[m_tileSelected], gridPosition, m_layerSelected);
                 }
 
                 if (Event.current.button == 1)
@@ -87,20 +102,40 @@ public class WorldMapEditor : Editor {
         }
 
         GUILayout.BeginHorizontal();
-        new GUIContent();
         Texture pencilIcon = (Texture)EditorGUIUtility.Load("pencil.png");
         Texture rubberIcon = (Texture)EditorGUIUtility.Load("rubber.png");
-
-        Texture[] textures = new Texture[]{ pencilIcon, rubberIcon };
+        Texture bucketIcon = (Texture)EditorGUIUtility.Load("bucket.png");
+        Texture[] textures = new Texture[]{ pencilIcon, rubberIcon, bucketIcon };
         m_editMode = GUILayout.Toolbar(m_editMode, textures, GUILayout.Width(48 * textures.Length), GUILayout.Height(48));
+
+        GUILayout.FlexibleSpace();
+        Texture layersIcon = (Texture)EditorGUIUtility.Load("layers.png");
+
+        GUILayout.BeginVertical();
+        GUILayout.Label("Current Layer:", new GUIStyle("WhiteBoldLabel"));
+        GUILayout.Label(Enum.GetName(typeof(MapLayers), m_layerSelected), new GUIStyle("AssetLabel"));
+        GUILayout.EndVertical();
+
+        if (GUILayout.Button(layersIcon, GUILayout.Width(50), GUILayout.Height(50)))
+        {
+            GenericMenu menu = new GenericMenu();
+            Array enums = Enum.GetValues(typeof(MapLayers));
+            Array.Reverse(enums);
+            foreach (MapLayers layer in enums)
+            {
+                bool selected = (layer == m_layerSelected);
+                menu.AddItem(new GUIContent(Enum.GetName(typeof(MapLayers), layer)), selected, ChangeLayer, layer);
+            }
+            //menu.AddSeparator("");
+            menu.ShowAsContext();
+        }
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
-
         Color tmpColor = GUI.backgroundColor;
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < tileset.Count; i++)
         {
-            Texture2D texture = AssetPreview.GetAssetPreview(sprites[i]);
+            Texture2D texture = AssetPreview.GetAssetPreview(tileset[i].sprite);
             GUIStyle btnStyle = GUI.skin.button;
             if (m_tileSelected == i)
             {
@@ -108,16 +143,21 @@ public class WorldMapEditor : Editor {
                 GUI.skin.button.border = new RectOffset(5,5,5,5);
             }
 
-            if (GUILayout.Button(texture, btnStyle))
+            if (GUILayout.Button(texture, btnStyle, GUILayout.Width(50), GUILayout.Height(50)))
                 m_tileSelected = i;
 
             GUI.backgroundColor = tmpColor;
         }
-        GUILayout.FlexibleSpace();
+        
         GUILayout.EndHorizontal();
 
         Handles.EndGUI();
 
         SceneView.RepaintAll();
+    }
+
+    void ChangeLayer(object layer)
+    {
+        m_layerSelected = (MapLayers)layer;
     }
 }

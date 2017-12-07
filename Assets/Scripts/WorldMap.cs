@@ -89,13 +89,21 @@ public class WorldMap : MonoBehaviour {
         return newMatrix;
     }
 
-    public void CreateTile(Sprite sprite, Vector2 gridPosition, MapLayers layer)
+    public void CreateTile(Tile tile, Vector2 gridPosition, MapLayers layer)
     {
-        if (m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] != null) return;
-        GameObject tile = Instantiate(grassPrefab, transform.position + new Vector3(gridPosition.x, gridPosition.y, 0), Quaternion.identity);
-        tile.GetComponentInChildren<SpriteRenderer>().sprite = sprite;
-        tile.transform.SetParent(transform);
-        m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] = tile;
+        if (m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] != null)
+        {
+            DeleteTile(gridPosition, layer);
+        }
+        GameObject tileGo = Instantiate(grassPrefab, transform.position + new Vector3(gridPosition.x, gridPosition.y, 0), Quaternion.identity);
+
+        SpriteRenderer sr = tileGo.GetComponentInChildren<SpriteRenderer>();
+        sr.sortingOrder = (int)layer;
+        sr.sprite = tile.sprite;
+        if (!tile.isWalkable)
+            sr.gameObject.AddComponent<BoxCollider2D>();
+        tileGo.transform.SetParent(transform);
+        m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] = tileGo;
     }
 
     public void DeleteTile(Vector2 gridPosition, MapLayers layer)
@@ -104,6 +112,45 @@ public class WorldMap : MonoBehaviour {
         if (tile == null) return;
         DestroyImmediate(tile);
         m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] = null;
+    }
+
+    public void PaintTile(Tile tile, Vector2 gridPosition, MapLayers layer)
+    {
+        Sprite lastSprite = null;
+        GameObject go = m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y];
+        if (go != null)
+        {
+            lastSprite = go.GetComponentInChildren<SpriteRenderer>().sprite;
+        }
+
+        Paint(m_worldMap[layer], tile, lastSprite, layer, (int)gridPosition.x, (int)gridPosition.y);
+    }
+
+    private void Paint(GameObject[,] worldMap, Tile tile, Sprite lastTile, MapLayers layer, int x, int y)
+    {
+        if (x < 0 || y < 0 || x >= worldMap.GetLength(0) || y >= worldMap.GetLength(1))
+            return;
+
+        if (lastTile == null)
+        {
+            if (worldMap[x, y] != null)
+                return;
+        }
+        else
+        {
+            GameObject currentTile = worldMap[x, y];
+            if (currentTile == null)
+                return;
+
+            if (currentTile.GetComponentInChildren<SpriteRenderer>().sprite != lastTile)
+                return;
+        }
+
+        CreateTile(tile, new Vector2(x,y), layer);
+        Paint(worldMap, tile, lastTile, layer, x + 1, y);
+        Paint(worldMap, tile, lastTile, layer, x, y + 1);
+        Paint(worldMap, tile, lastTile, layer, x - 1, y);
+        Paint(worldMap, tile, lastTile, layer, x, y - 1);
     }
 
     private void OnDrawGizmosSelected()
