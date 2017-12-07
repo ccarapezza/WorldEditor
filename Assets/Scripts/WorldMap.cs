@@ -1,56 +1,109 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+public enum MapLayers
+{
+    Terrain,
+    TerrainDetails,
+    Middle,
+    Roof
+}
 
 public class WorldMap : MonoBehaviour {
 
     public int rows;
     public int columns;
 
-    private int m_lastRows;
-    private int m_lastColumns;
-
     public float tileWidth = 1;
     public float tileHeight = 1;
 
     public GameObject grassPrefab;
-    private GameObject[,] m_map;
+    private Dictionary<MapLayers, GameObject[,]> m_worldMap;
 
     public WorldMap()
     {
         columns = 20;
         rows = 10;
-        recreateMapArray();
+        m_worldMap = new Dictionary<MapLayers, GameObject[,]>();
+        RecreateMapMatrix();
     }
 
-    private void recreateMapArray()
+    public void RecreateMapMatrix()
     {
-        m_lastRows = rows;
-        m_lastColumns = columns;
-        m_map = new GameObject[rows, columns];
+        foreach (MapLayers layer in Enum.GetValues(typeof(MapLayers)))
+        {
+            if (!m_worldMap.ContainsKey(layer))
+                m_worldMap[layer] = new GameObject[columns, rows];
+
+            GameObject[,] layerMap = m_worldMap[layer];
+            ResizeLayerMap(layer);
+        }
     }
 
-    private void Update()
+    public void ResizeLayerMap(MapLayers layer)
     {
-        if (rows != m_lastRows || columns != m_lastColumns)
-            recreateMapArray();
+        GameObject[,] mapLayer = m_worldMap[layer];
+
+        int oldCols = mapLayer.GetLength(0);
+        int oldRows = mapLayer.GetLength(1);
+
+        if ((oldRows > rows) || (oldCols > columns))
+        {
+            for (int c = columns; c < oldCols; c++)
+            {
+                for (int r = 0; r < oldRows; r++)
+                    DeleteTile(new Vector2(c, r), layer);
+            }
+            for (int r = rows; r < oldRows; r++)
+            {
+                for (int c = 0; c < oldCols; c++)
+                    DeleteTile(new Vector2(c, r), layer);
+            }
+        }
+
+        m_worldMap[layer] = ResizeMatrix(mapLayer, columns, rows);
     }
 
-    public void CreateTile(Sprite sprite, Vector2 gridPosition)
+    private GameObject[,] ResizeMatrix(GameObject[,] matrix, int newCols, int newRows)
     {
-        if (m_map[(int)gridPosition.x, (int)gridPosition.y] != null) return;
+        GameObject[,] newMatrix = new GameObject[newCols, newRows];
+        int currentCols = matrix.GetLength(0);
+        int currentRows = matrix.GetLength(1);
+        int maxCols = Mathf.Max(newCols, currentCols);
+        int maxRow = Mathf.Max(newRows, currentRows);
+
+        for (int i = 0; i < maxCols; i++)
+        {
+            for (int j = 0; j < maxRow; j++)
+            {
+                if (newMatrix.GetLength(0) <= i) continue;
+                if (newMatrix.GetLength(1) <= j) continue;
+                if (matrix.GetLength(0) <= i) continue;
+                if (matrix.GetLength(1) <= j) continue;
+                newMatrix[i, j] = matrix[i, j];
+            }
+        }
+
+        return newMatrix;
+    }
+
+    public void CreateTile(Sprite sprite, Vector2 gridPosition, MapLayers layer)
+    {
+        if (m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] != null) return;
         GameObject tile = Instantiate(grassPrefab, transform.position + new Vector3(gridPosition.x, gridPosition.y, 0), Quaternion.identity);
         tile.GetComponentInChildren<SpriteRenderer>().sprite = sprite;
         tile.transform.SetParent(transform);
-        m_map[(int)gridPosition.x, (int)gridPosition.y] = tile;
+        m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] = tile;
     }
 
-    public void DeleteTile(Vector2 gridPosition)
+    public void DeleteTile(Vector2 gridPosition, MapLayers layer)
     {
-        GameObject tile = m_map[(int)gridPosition.x, (int)gridPosition.y];
+        GameObject tile = m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y];
         if (tile == null) return;
         DestroyImmediate(tile);
-        m_map[(int)gridPosition.x, (int)gridPosition.y] = null;
+        m_worldMap[layer][(int)gridPosition.x, (int)gridPosition.y] = null;
     }
 
     private void OnDrawGizmosSelected()

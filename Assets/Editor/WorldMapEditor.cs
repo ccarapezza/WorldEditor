@@ -14,12 +14,23 @@ enum EditMode
 public class WorldMapEditor : Editor {
     private int m_editMode;
     private int m_tileSelected;
+    private MapLayers m_layerSelected = MapLayers.Terrain;
+
+    private int m_lastRows;
+    private int m_lastColumns;
+
     void OnSceneGUI()
     {
         WorldMap worldMap = (WorldMap)target;
+        Vector3 worldPosition = worldMap.transform.position;
         float worldWidth = worldMap.columns * worldMap.tileWidth;
         float worldHeight = worldMap.rows * worldMap.tileHeight;
-        Vector3 worldPosition = worldMap.transform.position;
+        if (worldMap.rows != m_lastRows || worldMap.columns != m_lastColumns)
+        {
+            m_lastRows = worldMap.rows;
+            m_lastColumns = worldMap.columns;
+            worldMap.RecreateMapMatrix();
+        }
 
         Handles.BeginGUI();
 
@@ -49,10 +60,10 @@ public class WorldMapEditor : Editor {
                 if (Event.current.button == 0)
                 {
                     if(m_editMode == (int)EditMode.Pencil)
-                        worldMap.CreateTile(sprites[m_tileSelected], gridPosition);
+                        worldMap.CreateTile(sprites[m_tileSelected], gridPosition, m_layerSelected);
 
                     if (m_editMode == (int)EditMode.Rubber)
-                        worldMap.DeleteTile(gridPosition);
+                        worldMap.DeleteTile(gridPosition, m_layerSelected);
                 }
 
                 if (Event.current.button == 1)
